@@ -1,0 +1,232 @@
+\documentclass[12pt,twoside,singlespace]{article}
+%\usepackage{lgrind}
+\pagestyle{plain}
+
+\usepackage{array, paralist, enumerate, amsmath, amsthm, amsfonts, amssymb, color, mathrsfs,comment}
+%\usepackage{times}
+\usepackage{geometry}
+\usepackage{framed}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+
+\usepackage{tikz}
+\usepackage{tkz-graph}
+\usetikzlibrary{arrows,%
+                shapes,positioning}
+
+\definecolor{DarkBlue}{rgb}{0,0,0.8} 
+\definecolor{DarkGreen}{rgb}{0,0.5,0.0} 
+\definecolor{DarkRed}{rgb}{0.9,0.0,0.0} 
+
+\usepackage[T1]{fontenc}
+\usepackage[latin1]{inputenc}
+%\usepackage[inline]{showlabels}
+
+\numberwithin{equation}{section}
+\newtheorem{theorem}[equation]{Theorem}
+\newtheorem{lemma}[equation]{Lemma}
+\newtheorem{cor}[equation]{Corollary}
+\newtheorem{prop}[equation]{Proposition}
+
+\theoremstyle{definition}
+\newtheorem{definition}[equation]{Definition}
+\newtheorem{ex}[equation]{Example}	
+\newtheorem{remark}[equation]{Remark}
+\newtheorem{game}{Game}
+
+\newcommand{\BB}{\mathbf{B}}
+\newcommand{\ZZ}{\mathbf{Z}}
+\newcommand{\NN}{\mathbf{N}}
+\newcommand{\RR}{\mathbf{R}}
+\newcommand{\QQ}{\mathbf{Q}}
+\newcommand{\CC}{\mathbf{C}}
+\newcommand{\FF}{\mathbf{F}}
+\newcommand{\N}{N}
+\newcommand{\po}[2]{\mathfrak{po}^{#1|#2}}
+\newcommand{\on}{\operatorname}
+\newcommand{\ra}{\rightarrow}
+\newcommand{\ul}{\underline}
+\newcommand{\ol}{\overline}
+\newcommand{\nin}{\noindent}
+
+\newcommand{\simple}{\text{simple}}
+\newcommand{\Img}{\on{Im}}
+\newcommand{\con}{\on{Con}}
+\newcommand{\dash}{\on{Dash}}
+
+\geometry{verbose,letterpaper,tmargin=1in}
+
+\newcommand{\Q}{\overline{q}}
+\newcommand{\w}{\on{weight}}
+\newcommand{\smon}{\mathbf{SMon}}
+\newcommand{\clif}{\on{clif}}
+\newcommand{\cl}{\mathbf{Cl}}
+%\newcommand{\mov}[2]{\on{mov}_{#2}(#1)}
+\newcommand{\inc}{\on{inc}}
+\newcommand{\cut}[4]{#1 = #2 \amalg_{#4} #3}
+\newcommand{\cutr}[3]{#1 \amalg_{#3} #2}
+%\newcommand{\piece}[3]{#1(#2|#3)}
+\newcommand{\piece}[3]{#1_{#3}}
+\newcommand{\wt}{\on{wt}}
+
+\newcommand{\com}[1]{\textcolor{red}{$[\star \star \star$ #1 $\star \star \star]$}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% LyX specific LaTeX commands.
+%% Bold symbol macro for standard LaTeX users
+\providecommand{\boldsymbol}[1]{\mbox{\boldmath $#1$}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% User specified LaTeX commands.
+\renewcommand{\vec}[1]{\mathbf{#1}}
+
+%\renewcommand{\labelenumi}{(\alph{enumi})}
+%\renewcommand{\labelenumii}{(\roman{enumii})}
+
+%\usepackage{babel}
+
+\title{Going ``All-Out'' on the Kaggle March Madness Challenge: Theory and Practice}
+\author{BAYZ\\
+Berkeley, CA}
+
+\begin{document}
+
+\pagestyle{plain}
+
+\maketitle
+
+
+\begin{abstract}
+We document lessons from our participation in the Kaggle March Madness Challenge in 2014, 2015, and 2016. Unlike a traditional March Madness bracket, in this competition the players predict \textbf{probabilities} of matches being won (instead of the winners) and are scored based on log odds. We study some toy games of this type to extract some theory on these games. We then discuss how we applied this theory and some other heuristics to the actual competition. 
+\end{abstract}
+
+
+\section{Motivation}
+
+Economics is taking over the world of decision making, and now many people outsource thinking to Economics, creating quantitative frameworks of ``rationality'' by deriving principles of thinking from mathematical axioms. A fundamental example of such a principle is when we want to know someone's honest belief about a probabilistic event in the style of Economics; i.e. by incentivizing the person to be honest via a utility or reward/punishment function. It is well-known that:
+
+\begin{prop}
+\label{prop:log}
+If we give the reward function in log form\cite{hansen} (that is, if someone predicts probability $p$ for a binary event $E$, giving them $\log(p)$ if $E$ happens and $\log(1-p)$ if $E$ does not happen), the subject maximizes expected utility by predicting his/her honest prediction for $p$.
+\end{prop}
+
+This is a great fact to keep in mind and we do not wish to belittle it. However, like all other attempts to map reality with mathematical frameworks, a possible (and very wrong!) lesson people may accidentally learn from this story is ``suppose we make a point-system for our game/auction/system; as long as we reward points based on the logarithm, people will give honest predictions.'' The key difference between this lesson and the setup of Proposition~\ref{prop:log} is that the utility people receives is frequently\footnote{The more accurate statement is probably ``with probability $1$''} not linear in the point system offered by the mechanism design. A few examples:
+
+\begin{itemize}
+\item in a poker tournament, the number of chips one has does not directly translate into the final utility of the player, even if we make the assumption that all of the utility is in the monetary payout (this itself is a fairly strong assumption). Suppose we have a single-table SNG (Sit-N-Go) tournament, then frequently the top, say, 3 players (these players are considered \emph{in the money} in poker parlance) out of 9 will receive payout simply based on the order in which they are eliminated. Thus, keeping in consideration of this final elimination, it may behoove the player to not make the ``highest +EV'' play for any particular hand. Thus, knowing how to make an adjustment based on the ``real'' utility function and not the ``proxy'' utility function of the nubmer of chips may be a very important technique\cite{poker-tournaments}, as is the one-step-further idea of knowing other people's systematic biases in knowing this fact (for example, the other players may be extremely risk-averse when they are about to be ``in the money'')\footnote{Even in a cash game of poker where one's number of chips can be cashed out correctly, there is some perturbation away from the ideals in term of rake, timed-rake, tips (if the player expects him/herself to tip when winning a pot), etc.}.
+\item a prediction market based on log payouts would probably enforce people to make the right predictions if they actually received negative utility when they had negative points (for example, if guessing very high values of $p$ in a particular bet and losing, which is likely to give the player huge amounts of negative points, forces the player to give conmensurate negative amounts of cash to the house). In a situation where, say, a raffle is given to the players with positive scores (or in some raffles, people are given enough chips simultaneusly to make the lowest-scoring participant have exactly one chip), the incentives to make the predictions honest may already be sufficiently erased.
+\item suppose Kaggle runs a March Madness competition \cite{kaggle} where players are asked to give probability estimates for each game that can possibly occur (${64 \choose 2}$ games, once the teams are actually set) instead of just a bracket, Proposition~\ref{prop:log} suggests that one should report honest beliefs about each game. However, again, this only holds if people's actual utility functions are linear with the score. As it happens, this competition only recognizes the top $2$ winners with a monetary award (in 2016, top $5$), so if our goal were to, say, be a paid winner, the optimal way of playing this game must be fairly different.
+\end{itemize}
+
+Thus, we explored how to play such games better than the default option of giving honest predictions. Out of amusement, we internally called the theoretical framework we are trying to build different variations of ``All-Out Theory.'' The rest of this paper explores a combination of the theoretical and practical considerations we had in our project. In Section~\ref{sec:all-out}, we explore all-out theory from a mathematical perspective, building intuition from several toy problems. In Section~\ref{sec:practice}, we talk about our actual lessons from the competitions, which include (but are not limited to) implementations of all-out theory.
+
+\section{All-Out Theory: Log-scoring Games}
+
+In this section, we study some basic betting games. We do not claim that the ideas and examples we explore here are profound or even original. Our goal is to exhibit parsimonious examples that capture what we consider to be nontrivial ``good'' betting intuitions.
+
+The basic example is the following game: 
+
+\begin{game}[Single Coin, Single Opponent]
+\label{game:bob}
+We flip a single coin with some probability $p \geq 1/2$ of coming up with heads. We play against a single opponent, Bob. Both players enter a prediction for the probability. The coin is flipped and the game is log-scored. The player with the higher log-score wins.
+\end{game}
+
+Let us assume the adversarial case that Bob is a perfect predictor (in fact, we really only need that Bob predicts on the correct side of $1/2$). If this were a cash game where we were rewarded/punished \emph{in utility} directly proportional to the log, we should bet probability $p$, as Bob may do.  However, the game we are actually playing is about \textbf{defeating} Bob, which is a different utility function. Many people will instinctively make the decision of betting a little more than $p$, say $p + \epsilon$, where $\epsilon > 0$. Because now with probability $p$ we win $1$, and with probability $1-p$ we lose $1$. 
+
+A more provocative situation is the following: 
+% \begin{game}
+% \label{game:bob-range}
+% The setup is the same as Game\ref{game:bob}, except that Bob is betting some distribution with support $[p_1, p_2]$, where $0 \leq p_1 \leq p_2 \leq 1$. 
+% \end{game}
+
+% It clearly suffices to pick either $p_1 - \epsilon$ or $p_2 + \epsilon$ to have the best chance of beating Bob with our information. Our bet only depends on how much of Bob's distribution is above $1/2$; we leave this as an exercise to the reader.
+
+% Finally, we should introduce the concept of having multiple players:
+
+\begin{game}[Single Coin, Multiple Opponents]
+\label{game:bob-army-range}
+The setup is the same as Game\ref{game:bob}, except we are playing against an army of Bobs, creatively named $Bob_1, Bob_2, \ldots$. Each $Bob_i$ bets for the coin to come up heads with probability $p_i$. The highest log-scoring participant wins.
+\end{game}
+
+It is not hard to see that if the true probability of heads is $p \geq 1/2$, then the optimal strategy is to predict probability $p_M + \epsilon$, where $p_M$ is the \textbf{maximum} of the $p_i$. Note that Game~\ref{game:bob-army-range} is really about \textbf{beating the combined support of the $p$'s that the opponents are willing to guess}; in particular, it is mostly \textbf{not} about predicting $p$, which does not even appear as a parameter in the optimal strategy except to dictate the direction of the bet!
+
+One good analogy is that playing against a group is basically the same as playing against a single Bob betting probability with a \textbf{distribution} of probabilities for heads in the ball $[a, b]$. In this case, we want to predict $[b + \epsilon]$ to be \textbf{just outside of the ball}. 
+
+The astute reader may think that it is good to keeping $\epsilon$ small to ``minimize risk,'' as one may do in an episode of \emph{The Price is Right}. The astuter reader has realized that $\epsilon$ is almost irrelevant; for this example, we might as well have predicted probability $1$, or equivalently, taking the $\epsilon$ to be as egregious as $(1-p)$. This recklessness is an artifact of the simplicity of our example. We now give a more complex game in which is it actually better to have some recking after all.
+
+\begin{game}[Two Coins, Single Opponent]
+\label{game:two-coins}
+The setup is the same as Game\ref{game:bob}, except that there are two coin flips with heads probabilities $p_1$ and $p_2$ respectively. For each $i$, Bob perfectly predicts probability $p_i$ for the corresponding coin to be heads. Again, the winner is the player with the higher combined log score. 
+\end{game}
+
+Suppose you make predictions $p_1 + \alpha$ and $p_2 + \beta$, where $\alpha$ and $\beta$ are reals. Note that there are $4$ possible outcomes, which we can label $\{HH, TH, HT, TT\}$ in the obvious fashion, and the expected value of this game comes down to which outcomes we can win.
+
+\begin{prop}
+
+\end{prop}
+
+So now, we see that an emergent behavior once we have two coin flips is to be reckless but control the amount of recklessness. This explains the ``Price is Right'' undercutting intuition.
+
+
+\section{All-Out Practice: Kaggle March Madness}
+\label{sec:practice}
+
+We now document our three attempts at the Kaggle March Madness Competition in 2014, 2015, and 2016. While we use some intuition that can be gained from Section~\ref{sec:all-out theory}, there are many things we tried that had nothing to do with ``all-out theory.'' We hope our exploration of our thinking process would be helpful to the reader.
+
+\subsection{2014 Competition}
+
+\begin{game}
+\label{game:mm}
+For the 2014 Kaggle March Mania competition, each team can give two submissions. Each submission consists of a predicted probability for each of ${68 \choose 2}$ potential matchups in the tournament, and each submission is scored by the cumulative log scores of all matchups that actually happen in the tournament. The single submission with the highest score wins $15000$, and there are no other prizes. There are about $250$ teams. 
+\end{game}
+
+$248$ teams entering the contest, for a total of $433$ submissions; each team were allowed $2$ submissions. We gave $2$ submissions, modeling winning as requiring a contrarian score equivalent to betting on a low-probability event of probability $p$ correctly. We thought of $p_1$ and $p_2$ (TODO) as upper- and lower-bounds on this $p$, and estimated two events as being roughly near this $p$, the teams selected based on the ``home'' institutions of our significant others:
+\begin{itemize}
+\item We believed the probability that Duke does XYZ was $p_1$;
+\item We believed the probability that Iowa State does XYZ was $p_2$.
+\end{itemize}
+Unfortunately, this strategy contains a mistake. We leave an exercise to the reader to find it; we address this issue in the next subsection)
+
+The actual outcome of the (basketball) contest was turbulent, as expected. Duke was upset; we were $4$-th at some point, though if we win our Iowa state bet we would have gotten first. The winning submission by Lopez and Matthews were detailed by the authors in \cite{lopez}. They did not use our type of methods and consisted mostly of ``honest'' modeling. Furthermore, they make a few interesting remarks:
+\begin{itemize}
+\item If one of their submissions were ``true'' probabilities of all the games, the entry would win with probability $12\%$ and $15\%$, depending on the submission. The authors use this as a statement about the luck factor involved in this game.
+\item Under the much less agressive assumption of the ``true'' probabilities being estimated by the median of the top $10$ submissions, the two entries' winrates become about $2\%$ apiece. Note that this is still much higher than uniformly random out of the $433$ entries.
+\item The authors run simulations assuming their submissions were ``true'' probabilities and note that around $1/5$ of the teams truly had \textbf{no} chance of winning. This supports our heuristic about not wanting entries to be inside the ``convex hull'' of other entries.
+\end{itemize}
+
+
+\subsection{2015 Competition}
+
+There were quite a few things to be learned from the denouemont of the previous competition. But first, the mistake: we gave $2$ submissions trying to ``estimate'' $p$. We just made the same mistake on the meta-level as we tried to not make on the object level. We should have just erred on the otherside of p -- lowballing $p$ means a wasted submission, as it would not win! We made sure to let the shame of this burn into our souls for the next competition.
+
+One thing we were able to do this year but not last year was perfect-hindsight analysis of the previous year. 
+
+Our own ``perfect hindsight analysis'' shows that we would have been around 19th by submitting ``real'' p's. - interestingly, YosarianLives hung around 22nd. It also showed that few people were going all-out. (TODO: how many?)
+
+
+There were $341$ teams this year for $612$ entries.
+
+One of the winners wrote a simulation which we can use to see the probabilities from the previous years.
+
+Correctly had 2 $p$'s.
+
+More sophisticated. Meta-prediction page.
+
+ZachB talks about BOT.
+
+\subsection{2016 Competition}
+
+In the largest competition so far, with $598$ teams and $1049$ entries.
+Used a simulator.
+
+Reverse solving how much p was good!
+
+Looked for ``quiet'' teams instead of ``random'' teams. It was unclear how much this improved our progress (this may be worth checking).
+
+\section{Future Work}
+
+We thank the Kaggle March Mania Machine Learning contest for giving us a situation to flesh out our ideas and to provide the case study in Section~\ref{sec:practice}. We thank Michael Lopez for valuable conversation.
+
+\bibliographystyle{abbrv}
+\bibliography{all-out-theory}
+
+\end{document}
